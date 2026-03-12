@@ -124,7 +124,54 @@ val topEnv: Environment = listOf(
 )
 
 
-// ---- Tests ----
+// ---------- Environment helpers ----------
+
+typealias Binding = Pair<String, Value>
+
+typealias Environment = List<Binding>
+
+fun mtEnv(): Environment = emptyList()
+
+fun extendEnv(env: Environment, name: String, value: Value): Environment =
+        listOf(name to value) + env //adds list<pair<string, value>> to list<pair<string, value>>
+//adds the new pair to the beginning of the env
+
+fun extendEnvStar(env: Environment, names: List<String>, values: List<Value>): Environment {
+    if (names.size != values.size) {
+        error("SZMX extend-env*: names/values length mismatch: ${names.size} vs ${values.size}")
+    }
+    var acc = env
+    for (i in names.indices) {
+        acc = extendEnv(acc, names[i], values[i])
+    }
+    return acc
+}
+
+fun lookup(name: String, env: Environment): Value {
+    for ((boundName, v) in env) {
+        if (boundName == name) return v //look for given name in the environment
+    }
+    error("SZMX unbound identifier: $name")
+}
+
+fun hasDuplicates(xs: List<String>): Boolean =
+        xs.size != xs.toSet().size //converts to set which gets rid of duplicates
+
+
+// ---------- Let desugaring (AST-level) ----------
+
+fun desugarLet(bindings: List<Pair<String, ExprC>>, body: ExprC): ExprC {
+    val names = bindings.map { it.first } //initializes list of names
+    if (hasDuplicates(names)) {
+        error("SZMX let: duplicate binding names")
+    }
+    val rhsExprs = bindings.map { it.second } //initializes list of values that names are binded to
+    return ExprC.AppC(
+            function = ExprC.FunC(params = names, body = body), //makes an appC with a funC that has names
+            args = rhsExprs //and associated values 
+    )
+}
+
 fun main() {
 
 }
