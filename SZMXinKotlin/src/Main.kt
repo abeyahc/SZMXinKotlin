@@ -1,3 +1,4 @@
+
 // ---------- SZMX in KOTLIN ----------
 
 
@@ -14,7 +15,7 @@ sealed class ExprC {
 
 
 // ---- Values ----
-typealias Environment = List<Pair<String, Value>> // delete this line when writing interp (just for compiling)
+//typealias Environment = List<Pair<String, Value>> // delete this line when writing interp (just for compiling)
 
 // sealed class: only allows certain types of subclasses
 sealed class Value {
@@ -172,6 +173,64 @@ fun desugarLet(bindings: List<Pair<String, ExprC>>, body: ExprC): ExprC {
     )
 }
 
+
+// Interpreter
+// when matches on what kind of expression it is
+fun interp(expr: ExprC, env: Environment): Value = when (expr) {
+
+    // Literals evaluate to themselves
+    is ExprC.NumC -> Value.NumV(expr.n)
+    is ExprC.StringC -> Value.StringV(expr.s)
+
+    // Identifiers: look up in environment for identifiers like + and x
+    is ExprC.IdC -> lookup(expr.name, env)
+
+    // If: evaluate test, must be boolean, then branch
+    is ExprC.IfC -> {
+        val testVal = interp(expr.test, env)
+        if (getBool(testVal, "if")) interp(expr.thenBranch, env)
+        else interp(expr.elseBranch, env)
+    }
+
+    // Function literal: gets current environment as closure
+    is ExprC.FunC -> {
+        if (expr.params.size != expr.params.toSet().size)
+            error("SZMX function: duplicate parameter names")
+        Value.ClosV(expr.params, expr.body, env)
+    }
+
+    // Application: evaluate function + args, then apply
+    is ExprC.AppC -> {
+        val funVal = interp(expr.function, env)
+        val argVals = expr.args.map { interp(it, env) }
+        when (funVal) {
+            
+            is Value.ClosV -> {
+                if (funVal.params.size != argVals.size)
+                    error("SZMX wrong arity: expected ${funVal.params.size} args, got ${argVals.size}")
+                interp(funVal.body, extendEnvStar(funVal.env, funVal.params, argVals))
+            }
+
+            is Value.PrimopV -> {
+                if (funVal.arity != argVals.size)
+                    error("SZMX wrong arity: ${funVal.name} expected ${funVal.arity} args, got ${argVals.size}")
+                funVal.op(argVals)
+            }
+
+            else -> error("SZMX application of non-procedure: ${serialize(funVal)}")
+        }
+    }
+}
+
 fun main() {
+    // (+ 3 4) -> 7
+    println(serialize(interp(ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.NumC(3.0), ExprC.NumC(4.0))), topEnv)))
+
+    // (let x = 10 in (+ x 5)) desugared into ((fun (x) => (+ x 5)) 10)
+    val letExpr = ExprC.AppC(
+        ExprC.FunC(listOf("x"), ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.IdC("x"), ExprC.NumC(5.0)))),
+        listOf(ExprC.NumC(10.0))
+    )
+    println(serialize(interp(letExpr, topEnv))) // result: 15
 
 }
