@@ -1,7 +1,6 @@
 
 // ---------- SZMX in KOTLIN ----------
 
-
 // ---- AST ----
 // sealed class: only allows certain types of subclasses
 sealed class ExprC {
@@ -13,16 +12,13 @@ sealed class ExprC {
     data class AppC(val function: ExprC, val args: List<ExprC>) : ExprC()
 }
 
-
 // ---- Values ----
-//typealias Environment = List<Pair<String, Value>> // delete this line when writing interp (just for compiling)
-
 // sealed class: only allows certain types of subclasses
 sealed class Value {
     data class NumV(val n: Double) : Value() // use: Value.NumV
     data class BoolV(val b: Boolean) : Value()
     data class StringV(val s: String) : Value()
-    data class ClosV(val params: List<String>, val body: ExprC, val env: Environment) : Value() // fill in Environment when writing interp
+    data class ClosV(val params: List<String>, val body: ExprC, val env: Environment) : Value()
     data class PrimopV(val name: String, val arity: Int, val op: (List<Value>) -> Value) : Value()
 }
 
@@ -126,7 +122,6 @@ val topEnv: Environment = listOf(
 
 
 // ---------- Environment helpers ----------
-
 typealias Binding = Pair<String, Value>
 
 typealias Environment = List<Binding>
@@ -222,6 +217,143 @@ fun interp(expr: ExprC, env: Environment): Value = when (expr) {
     }
 }
 
+// ---------- TESTS ----------
+
+fun runTests() {
+    var passed = 0
+    var failed = 0
+
+    fun check(name: String, expected: String, actual: String) {
+        if (expected == actual) {
+            println("PASS: $name")
+            passed++
+        } else {
+            println("* *   FAIL: $name — expected $expected, got $actual")
+            failed++
+        }
+    }
+
+    fun checkError(name: String, expectedMsg: String, block: () -> Unit) {
+        try {
+            block()
+            println("* *   FAIL: $name — expected error but got none")
+            failed++
+        } catch (e: IllegalStateException) {
+            if (e.message?.contains(expectedMsg) == true) {
+                println("PASS: $name")
+                passed++
+            } else {
+                println("* *   FAIL: $name — expected '$expectedMsg', got '${e.message}'")
+                failed++
+            }
+        }
+    }
+
+    fun interp(expr: ExprC) = serialize(interp(expr, topEnv))
+
+    // --- Literals ---
+    check("num literal", "42", interp(ExprC.NumC(42.0)))
+    check("string literal", "\"hello\"", interp(ExprC.StringC("hello")))
+    check("bool true", "true", interp(ExprC.IdC("true")))
+    check("bool false", "false", interp(ExprC.IdC("false")))
+
+    // --- Arithmetic ---
+    check("addition", "7",
+        interp(ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.NumC(3.0), ExprC.NumC(4.0)))))
+    check("subtraction", "7",
+        interp(ExprC.AppC(ExprC.IdC("-"), listOf(ExprC.NumC(10.0), ExprC.NumC(3.0)))))
+    check("multiplication", "12",
+        interp(ExprC.AppC(ExprC.IdC("*"), listOf(ExprC.NumC(3.0), ExprC.NumC(4.0)))))
+    check("division", "4",
+        interp(ExprC.AppC(ExprC.IdC("/"), listOf(ExprC.NumC(12.0), ExprC.NumC(3.0)))))
+
+    // --- Comparisons ---
+    check("lte true", "true",
+        interp(ExprC.AppC(ExprC.IdC("<="), listOf(ExprC.NumC(3.0), ExprC.NumC(4.0)))))
+    check("lte false", "false",
+        interp(ExprC.AppC(ExprC.IdC("<="), listOf(ExprC.NumC(5.0), ExprC.NumC(4.0)))))
+    check("lte equal", "true",
+        interp(ExprC.AppC(ExprC.IdC("<="), listOf(ExprC.NumC(4.0), ExprC.NumC(4.0)))))
+
+    // --- If ---
+    check("if true branch", "1",
+        interp(ExprC.IfC(ExprC.IdC("true"), ExprC.NumC(1.0), ExprC.NumC(2.0))))
+    check("if false branch", "2",
+        interp(ExprC.IfC(ExprC.IdC("false"), ExprC.NumC(1.0), ExprC.NumC(2.0))))
+
+    // --- Closures / Functions ---
+    check("function application", "7",
+        interp(ExprC.AppC(
+            ExprC.FunC(listOf("x", "y"),
+                ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.IdC("x"), ExprC.IdC("y")))),
+            listOf(ExprC.NumC(3.0), ExprC.NumC(4.0)))))
+
+    // --- Let (desugared) ---
+    check("let basic", "8",
+        interp(desugarLet(
+            listOf("x" to ExprC.NumC(5.0), "y" to ExprC.NumC(3.0)),
+            ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.IdC("x"), ExprC.IdC("y"))))))
+
+    // closure captures environment
+    check("closure captures env", "15",
+        interp(desugarLet(
+            listOf("z" to ExprC.NumC(10.0)),
+            ExprC.AppC(
+                ExprC.FunC(listOf("x"),
+                    ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.IdC("x"), ExprC.IdC("z")))),
+                listOf(ExprC.NumC(5.0))))))
+
+    // --- String operations ---
+    check("substring", "\"ell\"",
+        interp(ExprC.AppC(ExprC.IdC("substring"),
+            listOf(ExprC.StringC("hello"), ExprC.NumC(1.0), ExprC.NumC(4.0)))))
+    check("strlen", "5",
+        interp(ExprC.AppC(ExprC.IdC("strlen"), listOf(ExprC.StringC("hello")))))
+
+    // --- equal? ---
+    check("equal? nums true", "true",
+        interp(ExprC.AppC(ExprC.IdC("equal?"), listOf(ExprC.NumC(5.0), ExprC.NumC(5.0)))))
+    check("equal? nums false", "false",
+        interp(ExprC.AppC(ExprC.IdC("equal?"), listOf(ExprC.NumC(5.0), ExprC.NumC(6.0)))))
+    check("equal? mixed types", "false",
+        interp(ExprC.AppC(ExprC.IdC("equal?"), listOf(ExprC.NumC(5.0), ExprC.IdC("true")))))
+
+    // --- Errors ---
+    checkError("division by zero", "division by zero") {
+        interp(ExprC.AppC(ExprC.IdC("/"), listOf(ExprC.NumC(1.0), ExprC.NumC(0.0))))
+    }
+    checkError("unbound identifier", "unbound identifier") {
+        interp(ExprC.IdC("notDefined"))
+    }
+    checkError("wrong arity primop", "wrong arity") {
+        interp(ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.NumC(1.0))))
+    }
+    checkError("wrong arity closure", "wrong arity") {
+        interp(ExprC.AppC(ExprC.FunC(listOf("x", "y"), ExprC.IdC("x")), listOf(ExprC.NumC(1.0))))
+    }
+    checkError("apply non-procedure", "application of non-procedure") {
+        interp(ExprC.AppC(ExprC.NumC(5.0), listOf(ExprC.NumC(1.0))))
+    }
+    checkError("if non-boolean", "if expects boolean") {
+        interp(ExprC.IfC(ExprC.NumC(5.0), ExprC.NumC(1.0), ExprC.NumC(2.0)))
+    }
+    checkError("duplicate params", "duplicate parameter") {
+        interp(ExprC.FunC(listOf("x", "x"), ExprC.NumC(1.0)))
+    }
+    checkError("duplicate let bindings", "duplicate binding") {
+        interp(desugarLet(listOf("x" to ExprC.NumC(1.0), "x" to ExprC.NumC(2.0)), ExprC.IdC("x")))
+    }
+    checkError("user error", "user-error") {
+        interp(ExprC.AppC(ExprC.IdC("error"), listOf(ExprC.NumC(5.0))))
+    }
+    checkError("substring out of range", "out of range") {
+        interp(ExprC.AppC(ExprC.IdC("substring"),
+            listOf(ExprC.StringC("hello"), ExprC.NumC(0.0), ExprC.NumC(6.0))))
+    }
+
+    println("\n${passed + failed} tests: $passed passed, $failed failed")
+}
+
 fun main() {
     // (+ 3 4) -> 7
     println(serialize(interp(ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.NumC(3.0), ExprC.NumC(4.0))), topEnv)))
@@ -232,5 +364,7 @@ fun main() {
         listOf(ExprC.NumC(10.0))
     )
     println(serialize(interp(letExpr, topEnv))) // result: 15
+
+    runTests()
 
 }
