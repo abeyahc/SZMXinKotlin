@@ -249,106 +249,104 @@ fun runTests() {
         }
     }
 
-    fun interp(expr: ExprC) = serialize(interp(expr, topEnv))
-
     // --- Literals ---
-    check("num literal", "42", interp(ExprC.NumC(42.0)))
-    check("string literal", "\"hello\"", interp(ExprC.StringC("hello")))
-    check("bool true", "true", interp(ExprC.IdC("true")))
-    check("bool false", "false", interp(ExprC.IdC("false")))
+    check("num literal", "42", serialize(interp(ExprC.NumC(42.0), topEnv)))
+    check("string literal", "\"hello\"", serialize(interp(ExprC.StringC("hello"), topEnv)))
+    check("bool true", "true", serialize(interp(ExprC.IdC("true"), topEnv)))
+    check("bool false", "false", serialize(interp(ExprC.IdC("false"), topEnv)))
 
     // --- Arithmetic ---
     check("addition", "7",
-        interp(ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.NumC(3.0), ExprC.NumC(4.0)))))
+        serialize(interp(ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.NumC(3.0), ExprC.NumC(4.0))), topEnv)))
     check("subtraction", "7",
-        interp(ExprC.AppC(ExprC.IdC("-"), listOf(ExprC.NumC(10.0), ExprC.NumC(3.0)))))
+        serialize(interp(ExprC.AppC(ExprC.IdC("-"), listOf(ExprC.NumC(10.0), ExprC.NumC(3.0))), topEnv)))
     check("multiplication", "12",
-        interp(ExprC.AppC(ExprC.IdC("*"), listOf(ExprC.NumC(3.0), ExprC.NumC(4.0)))))
+        serialize(interp(ExprC.AppC(ExprC.IdC("*"), listOf(ExprC.NumC(3.0), ExprC.NumC(4.0))), topEnv)))
     check("division", "4",
-        interp(ExprC.AppC(ExprC.IdC("/"), listOf(ExprC.NumC(12.0), ExprC.NumC(3.0)))))
+        serialize(interp(ExprC.AppC(ExprC.IdC("/"), listOf(ExprC.NumC(12.0), ExprC.NumC(3.0))), topEnv)))
 
     // --- Comparisons ---
     check("lte true", "true",
-        interp(ExprC.AppC(ExprC.IdC("<="), listOf(ExprC.NumC(3.0), ExprC.NumC(4.0)))))
+        serialize(interp(ExprC.AppC(ExprC.IdC("<="), listOf(ExprC.NumC(3.0), ExprC.NumC(4.0))), topEnv)))
     check("lte false", "false",
-        interp(ExprC.AppC(ExprC.IdC("<="), listOf(ExprC.NumC(5.0), ExprC.NumC(4.0)))))
+        serialize(interp(ExprC.AppC(ExprC.IdC("<="), listOf(ExprC.NumC(5.0), ExprC.NumC(4.0))), topEnv)))
     check("lte equal", "true",
-        interp(ExprC.AppC(ExprC.IdC("<="), listOf(ExprC.NumC(4.0), ExprC.NumC(4.0)))))
+        serialize(interp(ExprC.AppC(ExprC.IdC("<="), listOf(ExprC.NumC(4.0), ExprC.NumC(4.0))), topEnv)))
 
     // --- If ---
     check("if true branch", "1",
-        interp(ExprC.IfC(ExprC.IdC("true"), ExprC.NumC(1.0), ExprC.NumC(2.0))))
+        serialize(interp(ExprC.IfC(ExprC.IdC("true"), ExprC.NumC(1.0), ExprC.NumC(2.0)), topEnv)))
     check("if false branch", "2",
-        interp(ExprC.IfC(ExprC.IdC("false"), ExprC.NumC(1.0), ExprC.NumC(2.0))))
+        serialize(interp(ExprC.IfC(ExprC.IdC("false"), ExprC.NumC(1.0), ExprC.NumC(2.0)), topEnv)))
 
     // --- Closures / Functions ---
     check("function application", "7",
-        interp(ExprC.AppC(
+        serialize(interp(ExprC.AppC(
             ExprC.FunC(listOf("x", "y"),
                 ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.IdC("x"), ExprC.IdC("y")))),
-            listOf(ExprC.NumC(3.0), ExprC.NumC(4.0)))))
+            listOf(ExprC.NumC(3.0), ExprC.NumC(4.0))), topEnv)))
 
     // --- Let (desugared) ---
     check("let basic", "8",
-        interp(desugarLet(
+        serialize(interp(desugarLet(
             listOf("x" to ExprC.NumC(5.0), "y" to ExprC.NumC(3.0)),
-            ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.IdC("x"), ExprC.IdC("y"))))))
+            ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.IdC("x"), ExprC.IdC("y")))), topEnv)))
 
     // closure captures environment
     check("closure captures env", "15",
-        interp(desugarLet(
+        serialize(interp(desugarLet(
             listOf("z" to ExprC.NumC(10.0)),
             ExprC.AppC(
                 ExprC.FunC(listOf("x"),
                     ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.IdC("x"), ExprC.IdC("z")))),
-                listOf(ExprC.NumC(5.0))))))
+                listOf(ExprC.NumC(5.0)))), topEnv)))
 
     // --- String operations ---
     check("substring", "\"ell\"",
-        interp(ExprC.AppC(ExprC.IdC("substring"),
-            listOf(ExprC.StringC("hello"), ExprC.NumC(1.0), ExprC.NumC(4.0)))))
+        serialize(interp(ExprC.AppC(ExprC.IdC("substring"),
+            listOf(ExprC.StringC("hello"), ExprC.NumC(1.0), ExprC.NumC(4.0))), topEnv)))
     check("strlen", "5",
-        interp(ExprC.AppC(ExprC.IdC("strlen"), listOf(ExprC.StringC("hello")))))
+        serialize(interp(ExprC.AppC(ExprC.IdC("strlen"), listOf(ExprC.StringC("hello"))), topEnv)))
 
     // --- equal? ---
     check("equal? nums true", "true",
-        interp(ExprC.AppC(ExprC.IdC("equal?"), listOf(ExprC.NumC(5.0), ExprC.NumC(5.0)))))
+        serialize(interp(ExprC.AppC(ExprC.IdC("equal?"), listOf(ExprC.NumC(5.0), ExprC.NumC(5.0))), topEnv)))
     check("equal? nums false", "false",
-        interp(ExprC.AppC(ExprC.IdC("equal?"), listOf(ExprC.NumC(5.0), ExprC.NumC(6.0)))))
+        serialize(interp(ExprC.AppC(ExprC.IdC("equal?"), listOf(ExprC.NumC(5.0), ExprC.NumC(6.0))), topEnv)))
     check("equal? mixed types", "false",
-        interp(ExprC.AppC(ExprC.IdC("equal?"), listOf(ExprC.NumC(5.0), ExprC.IdC("true")))))
+        serialize(interp(ExprC.AppC(ExprC.IdC("equal?"), listOf(ExprC.NumC(5.0), ExprC.IdC("true"))), topEnv)))
 
     // --- Errors ---
     checkError("division by zero", "division by zero") {
-        interp(ExprC.AppC(ExprC.IdC("/"), listOf(ExprC.NumC(1.0), ExprC.NumC(0.0))))
+        interp(ExprC.AppC(ExprC.IdC("/"), listOf(ExprC.NumC(1.0), ExprC.NumC(0.0))), topEnv)
     }
     checkError("unbound identifier", "unbound identifier") {
-        interp(ExprC.IdC("notDefined"))
+        interp(ExprC.IdC("notDefined"), topEnv)
     }
     checkError("wrong arity primop", "wrong arity") {
-        interp(ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.NumC(1.0))))
+        interp(ExprC.AppC(ExprC.IdC("+"), listOf(ExprC.NumC(1.0))), topEnv)
     }
     checkError("wrong arity closure", "wrong arity") {
-        interp(ExprC.AppC(ExprC.FunC(listOf("x", "y"), ExprC.IdC("x")), listOf(ExprC.NumC(1.0))))
+        interp(ExprC.AppC(ExprC.FunC(listOf("x", "y"), ExprC.IdC("x")), listOf(ExprC.NumC(1.0))), topEnv)
     }
     checkError("apply non-procedure", "application of non-procedure") {
-        interp(ExprC.AppC(ExprC.NumC(5.0), listOf(ExprC.NumC(1.0))))
+        interp(ExprC.AppC(ExprC.NumC(5.0), listOf(ExprC.NumC(1.0))), topEnv)
     }
     checkError("if non-boolean", "if expects boolean") {
-        interp(ExprC.IfC(ExprC.NumC(5.0), ExprC.NumC(1.0), ExprC.NumC(2.0)))
+        interp(ExprC.IfC(ExprC.NumC(5.0), ExprC.NumC(1.0), ExprC.NumC(2.0)), topEnv)
     }
     checkError("duplicate params", "duplicate parameter") {
-        interp(ExprC.FunC(listOf("x", "x"), ExprC.NumC(1.0)))
+        interp(ExprC.FunC(listOf("x", "x"), ExprC.NumC(1.0)), topEnv)
     }
     checkError("duplicate let bindings", "duplicate binding") {
-        interp(desugarLet(listOf("x" to ExprC.NumC(1.0), "x" to ExprC.NumC(2.0)), ExprC.IdC("x")))
+        desugarLet(listOf("x" to ExprC.NumC(1.0), "x" to ExprC.NumC(2.0)), ExprC.IdC("x"))
     }
     checkError("user error", "user-error") {
-        interp(ExprC.AppC(ExprC.IdC("error"), listOf(ExprC.NumC(5.0))))
+        interp(ExprC.AppC(ExprC.IdC("error"), listOf(ExprC.NumC(5.0))), topEnv)
     }
     checkError("substring out of range", "out of range") {
         interp(ExprC.AppC(ExprC.IdC("substring"),
-            listOf(ExprC.StringC("hello"), ExprC.NumC(0.0), ExprC.NumC(6.0))))
+            listOf(ExprC.StringC("hello"), ExprC.NumC(0.0), ExprC.NumC(6.0))), topEnv)
     }
 
     println("\n${passed + failed} tests: $passed passed, $failed failed")
